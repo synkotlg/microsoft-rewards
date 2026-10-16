@@ -1,0 +1,11 @@
+# Profil Edge : contient la session du compte Microsoft (cookies), ne jamais publier
+edge-profile/
+
+# Donnees locales
+logs/
+state.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc

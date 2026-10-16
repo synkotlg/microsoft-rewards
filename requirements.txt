@@ -1,0 +1,2 @@
+playwright>=1.50
+pyvda>=0.6
