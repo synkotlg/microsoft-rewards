@@ -26,12 +26,19 @@ REWARDS = "https://rewards.bing.com"
 DASHBOARD = REWARDS + "/dashboard"
 EARN = REWARDS + "/earn"
 
-# Liens jamais suivis : échange de points, téléchargements, installations, parrainage, boutique,
+# Liens jamais suivis : échange de points, téléchargements, installations, boutique,
 # liens qui ouvrent une application Windows.
 SKIP_LINKS = (
-    "/redeem", "apps.microsoft.com", "/apps/wallpaper", "microsoft-edge://", "ms-windows-store:",
-    "ms-search:", "referandearn", "/refer", "microsoft.com/fr-fr/store", "xbox.com", "autodownload=",
+    "/redeem", "apps.microsoft.com", "microsoft-edge://", "ms-windows-store:",
+    "ms-search:", "microsoft.com/fr-fr/store", "xbox.com", "autodownload=",
 )
+
+# Pages de présentation (fond d'écran Bing, application Rewards, parrainage) : c'est la simple
+# visite de la page que Microsoft valide (carte « parrainage » de l'ensemble du jour, dernière tâche
+# d'une quête...). On ouvre la page sans rien y faire : rien n'est installé ni partagé, et les
+# téléchargements sont bloqués dans le navigateur.
+VISIT_ONLY = ("bing.com/apps/wallpaper", "bing.com/apps/rewards", "rewards.bing.com/referandearn")
+LINK_FIELDS = ("href", "destination", "ctaUrl")
 
 # Offres jamais faites, d'après leur texte : téléchargement, installation, parrainage.
 SKIP_TEXT = re.compile(r"t[ée]l[ée]charg|install|download|parrain", re.I)
@@ -303,10 +310,18 @@ def skipped_link(o: dict) -> bool:
     return any(s in v.lower() for v in o.values() if isinstance(v, str) for s in SKIP_LINKS)
 
 
+def visit_only(o: dict) -> bool:
+    """Vrai si tous les liens de l'offre mènent à une page de présentation (VISIT_ONLY)."""
+    links = [str(o[k]).lower() for k in LINK_FIELDS if o.get(k)]
+    return bool(links) and all(any(p in link for p in VISIT_ONLY) for link in links)
+
+
 def excluded(o: dict) -> str | None:
     """Raison pour laquelle l'offre n'est jamais faite, sinon None."""
     if skipped_link(o):
         return "lien exclu"
+    if visit_only(o):  # « Télécharger le fond d'écran », « Parrainez » : on ouvre seulement la page
+        return None
     if any(SKIP_TEXT.search(str(o.get(k) or "")) for k in TEXT_FIELDS):
         return "téléchargement, installation ou parrainage"
     return None

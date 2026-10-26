@@ -27,9 +27,25 @@ ouvrir un lien vers une application Windows (`ms-search:`, Microsoft Store). Les
 ou le texte l'indique (« Télécharger… », « Installer… », « Parrainez… ») sont ignorées, et les
 téléchargements sont de toute façon bloqués dans le navigateur.
 
+Exception : quand le lien de l'offre mène seulement à une **page de présentation** (fond d'écran Bing,
+application Rewards, page « Parrainer et gagner »), le script ouvre la page sans rien y faire, car c'est
+cette visite que Microsoft valide. Exemples : la carte « parrainage » de l'ensemble du jour (+10, et
+l'ensemble complet 3/3 pour la série de 7 jours), la tâche « fond d'écran » qui termine une quête (+50).
+Rien n'est installé, téléchargé ni partagé.
+
 Non fait : les tâches de l'application mobile Bing (check-in, « lire pour gagner », séries de
 l'application). Sur PC, elles ne sont faisables qu'en imitant l'application auprès des serveurs de
 Microsoft, ce qui est la méthode la plus repérée. Elles prennent une minute à la main sur le téléphone.
+
+## Les points que seul un humain peut gagner
+
+Ces bonus valent plus que ce que le script rapporte en un mois, et ne s'automatisent pas :
+
+| Bonus | Jusqu'à | Comment |
+|---|---|---|
+| Bonus Bing Star | 2 100 pts/mois (Or) | Microsoft le calcule sur les **recherches authentiques** : celles du script ne comptent presque pas. Fais tes vraies recherches sur Bing, connecté à ce compte Microsoft. |
+| Bonus Recherche par défaut | 210 pts/mois (Or) | Bing comme moteur de recherche par défaut de ton navigateur habituel, et des recherches au moins 14 jours dans le mois. |
+| Série d'applications Bing | +5/jour, plus le bonus de série et des tampons | Check-in quotidien dans l'application Bing sur le téléphone (12 tampons = 1 000 points). |
 
 ## Arrêt automatique si Microsoft signale le compte
 
@@ -45,11 +61,12 @@ C'est le moment d'arrêter l'automatisation (`desinstaller_tache.ps1`) plutôt q
    (ton Edge habituel n'est pas touché).
 2. Planifie l'exécution quotidienne (dans PowerShell, depuis ce dossier) :
    ```powershell
-   powershell -ExecutionPolicy Bypass -File .\installer_tache.ps1            # 13h00 par défaut
-   powershell -ExecutionPolicy Bypass -File .\installer_tache.ps1 -Heure 09:30
+   powershell -ExecutionPolicy Bypass -File .\installer_tache.ps1            # 13h00 et 18h00 par défaut
+   powershell -ExecutionPolicy Bypass -File .\installer_tache.ps1 -Heure 09:30 -Heure2 19:00
    ```
-   La tâche tourne aussi 5 min après chaque ouverture de session, et elle est rattrapée si le PC
-   était éteint à l'heure prévue.
+   Deux passages par jour : une partie des activités n'est publiée qu'en cours de journée (vers 8-9h),
+   le second passage les récupère. La tâche tourne aussi 5 min après chaque ouverture de session, et
+   elle est rattrapée si le PC était éteint à l'heure prévue.
 
 ## Utilisation
 
