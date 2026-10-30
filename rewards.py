@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -20,10 +21,12 @@ import search
 from browser import edge
 from quests import DASHBOARD, EARN, AccountFlagged, Rewards, offers, page_data
 from state import State
+from telegram_notify import TelegramNotifier, load_env_file
 
 ROOT = Path(__file__).parent
 LOG_DIR = ROOT / "logs"
 DUMP_DIR = ROOT / "dump"
+ENV_FILE = ROOT / ".env"
 
 # Pause aléatoire (en secondes) entre deux recherches Bing.
 SEARCH_DELAY = (15, 45)
@@ -87,25 +90,42 @@ def setup():
     print("  Connexion enregistrée ✓\n" if ok else "  Pas connecté : relance setup.bat.\n")
 
 
-def run(visible: bool, with_search: bool) -> int:
-    code, message = session(visible, with_search)
+def format_duration(seconds):
+    minutes, secs = divmod(int(round(seconds)), 60)
+    return f"{minutes} min {secs:02d} s" if minutes else f"{secs} s"
+
+
+def format_summary(start, end, gained, done, mobile_searches, elapsed):
+    """Message Telegram de fin d'exécution (français, lu par l'utilisateur)."""
+    note = ", hors recherches mobiles" if mobile_searches else ""
+    return (f"Terminé en {format_duration(elapsed)} : {start} → {end} points (+{gained}{note}). "
+            f"Actions validées : {done}.")
+
+
+def run(visible: bool, with_search: bool, notify) -> int:
+    notify("Lancement" + ("" if with_search else " (sans les recherches Bing)")
+           + (" (fenêtre visible)" if visible else ""))
+    code, message, summary = session(visible, with_search)
+    notify(summary)
     # L'alerte (bloquante) n'est affichée qu'une fois Edge et le bureau caché refermés.
     if message:
         alert(message)
     return code
 
 
-def session(visible: bool, with_search: bool) -> tuple[int, str | None]:
-    """Fait les quêtes. Renvoie (code de sortie, message d'alerte éventuel)."""
+def session(visible: bool, with_search: bool) -> tuple[int, str | None, str]:
+    """Fait les quêtes. Renvoie (code de sortie, message d'alerte éventuel, résumé Telegram)."""
     state = State()
     mobile_searches = 0
+    started = time.monotonic()
     with sync_playwright() as pw:
         with edge(pw, visible=visible) as ctx:
             r = Rewards(ctx, state)
             try:
                 if not r.logged_in():
                     log.error("Pas connecté au compte Microsoft : lance setup.bat pour te reconnecter.")
-                    return 2, "Ta session Microsoft Rewards a expiré.\n\nLance setup.bat pour te reconnecter."
+                    return (2, "Ta session Microsoft Rewards a expiré.\n\nLance setup.bat pour te reconnecter.",
+                            "Échec : la session Microsoft a expiré, aucune quête faite (lance setup.bat).")
                 start = r.balance(page_data(r.page))
                 log.info("Solde de départ : %s points", start)
 
@@ -138,9 +158,10 @@ def session(visible: bool, with_search: bool) -> tuple[int, str | None]:
                     end = None
             except AccountFlagged as flag:
                 log.error("Compte signalé par Microsoft (%s) : arrêt immédiat, rien d'autre n'est fait.", flag)
-                return 3, (f"Microsoft Rewards signale ton compte :\n\n{flag}\n\n"
-                           "Le script s'est arrêté sans rien faire. Il s'arrêtera de la même façon "
-                           "tant que cet avertissement sera présent.")
+                return (3, (f"Microsoft Rewards signale ton compte :\n\n{flag}\n\n"
+                            "Le script s'est arrêté sans rien faire. Il s'arrêtera de la même façon "
+                            "tant que cet avertissement sera présent."),
+                        f"Compte signalé par Microsoft : {flag}. Arrêt immédiat, rien d'autre n'a été fait.")
 
         mobile = counters.get("mobile") or {}
         if with_search and mobile.get("max", 0) > mobile.get("progress", 0):
@@ -155,7 +176,8 @@ def session(visible: bool, with_search: bool) -> tuple[int, str | None]:
     gained = (end - start) if isinstance(start, int) and isinstance(end, int) else "?"
     log.info("Terminé : %s → %s points (+%s%s). Actions validées : %d", start, end, gained,
              ", hors recherches mobiles" if mobile_searches else "", len(r.done))
-    return 0, None
+    return 0, None, format_summary(start, end, gained, len(r.done), mobile_searches,
+                                   time.monotonic() - started)
 
 
 def dump(visible: bool):
@@ -179,9 +201,17 @@ def main():
     parser.add_argument("--visible", action="store_true", help="fenêtre visible au lieu du bureau caché")
     parser.add_argument("--no-search", action="store_true", help="ne fait pas les recherches Bing")
     parser.add_argument("--dump", action="store_true", help="sauvegarde les pages Rewards pour le débogage")
+    parser.add_argument("--notify-name", default="microsoft-rewards",
+                        help="nom du projet mis devant chaque message Telegram (défaut : microsoft-rewards)")
+    parser.add_argument("--env-file", default=str(ENV_FILE),
+                        help="fichier KEY=VALUE chargé au démarrage, les vraies variables d'environnement "
+                             "l'emportent (défaut : .env à côté de rewards.py)")
     args = parser.parse_args()
 
     setup_logging()
+    loaded = load_env_file(args.env_file)
+    if loaded:
+        log.info("Variables chargées depuis %s : %s", args.env_file, ", ".join(loaded))
     mutex = single_instance()
     if mutex is None:
         log.info("Déjà en cours d'exécution, on s'arrête.")
@@ -192,10 +222,14 @@ def main():
     if args.dump:
         dump(args.visible)
         return 0
+    # Notifications Telegram (silencieuses si TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID ne sont pas définis).
+    notifier = TelegramNotifier.from_env(prefix=f"[{args.notify_name}] ")
+    notify = notifier.send if notifier else (lambda text: False)
     try:
-        return run(args.visible, with_search=not args.no_search)
-    except Exception:
+        return run(args.visible, with_search=not args.no_search, notify=notify)
+    except Exception as err:
         log.exception("Erreur inattendue")
+        notify(f"Échec inattendu : {type(err).__name__}: {err} (voir les journaux).")
         return 1
 
 

@@ -78,6 +78,23 @@ C'est le moment d'arrêter l'automatisation (`desinstaller_tache.ps1`) plutôt q
 - Si la session expire, une fenêtre d'alerte le signale : relance `setup.bat`.
 - Pour arrêter l'automatisation : `desinstaller_tache.ps1`.
 
+## Notifications Telegram (facultatif)
+
+Reçois un message Telegram à chaque exécution : « Lancement » au début, puis un résumé à la fin
+(points de départ → fin, gain, actions validées), ou le motif de l'échec (session expirée, compte
+signalé, erreur). Pratique quand le script tourne tout seul via la tâche planifiée.
+
+1. Double-clique sur **`notifications.bat`** : une fenêtre de navigateur s'ouvre, le script crée un
+   bot auprès de @BotFather et enregistre `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` dans `.env`
+   (à côté de `rewards.py`). Suis les indications ; chaque étape peut aussi se faire à la main dans
+   la fenêtre. Un message de test arrive sur Telegram à la fin.
+2. C'est tout : `lancer.bat` et la tâche planifiée enverront désormais leurs notifications.
+
+- Un bot existant : `notifications.bat --token 123456:ABC...` (saute la création).
+- `.env` contient le jeton du bot : il est ignoré par git (`.gitignore`), ne le publie pas.
+- Sans `.env` (ou sans ces deux variables), le script fonctionne exactement comme avant, sans rien envoyer.
+- Tester l'envoi : `.venv\Scripts\python.exe telegram_notify.py "coucou" --prefix "[microsoft-rewards] "`.
+
 ## Si Microsoft change son site
 
 `lancer.bat --dump` enregistre les pages et les offres détectées dans `dump/` pour comprendre

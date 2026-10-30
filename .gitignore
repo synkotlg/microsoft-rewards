@@ -5,6 +5,9 @@ edge-profile/
 logs/
 state.json
 
+# Jeton du bot Telegram (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID), ne jamais publier
+.env
+
 # Python
 .venv/
 __pycache__/
