@@ -14,7 +14,7 @@ import re
 from contextlib import suppress
 from urllib.parse import urlsplit
 
-from playwright.sync_api import BrowserContext, Page
+from playwright.sync_api import BrowserContext, Locator, Page
 from playwright.sync_api import Error as PWError
 
 import search
@@ -39,6 +39,10 @@ SKIP_LINKS = (
 # téléchargements sont bloqués dans le navigateur.
 VISIT_ONLY = ("bing.com/apps/wallpaper", "bing.com/apps/rewards", "rewards.bing.com/referandearn")
 LINK_FIELDS = ("href", "destination", "ctaUrl")
+
+# Quêtes exclusives à l'application Rewards pour ordinateur (« Exclusivité de l'application Rewards ») :
+# verrouillées dans Edge, elles sont faites dans l'application (rewards_app.py).
+APP_QUEST = re.compile(r"RewardsApp", re.I)
 
 # Offres jamais faites, d'après leur texte : téléchargement, installation, parrainage.
 SKIP_TEXT = re.compile(r"t[ée]l[ée]charg|install|download|parrain", re.I)
@@ -337,11 +341,12 @@ class AccountFlagged(Exception):
 
 
 class Rewards:
-    def __init__(self, ctx: BrowserContext, state: State | None = None):
+    def __init__(self, ctx: BrowserContext, state: State | None = None, page: Page | None = None):
         self.ctx = ctx
-        self.page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        self.page = page or (ctx.pages[0] if ctx.pages else ctx.new_page())
         self.state = state or State()
         self.done: list[str] = []
+        self.app_quests: list[str] = []  # quêtes exclusives à l'application, vues par quests()
 
     # ------------------------------------------------------------------ outils
 
@@ -481,16 +486,7 @@ class Rewards:
         try:
             loc.scroll_into_view_if_needed(timeout=10000)
             pause(page, 0.8, 2)
-            # La carte ouvre normalement un nouvel onglet ; certaines naviguent dans l'onglet courant.
-            clicked, tab = False, None
-            try:
-                with self.ctx.expect_page(timeout=20000 if blank else 5000) as info:
-                    loc.click(timeout=15000)
-                    clicked = True
-                tab = info.value
-            except PWError:
-                if not clicked:
-                    raise
+            tab = self.open_card(loc, blank)
             if tab is not None:
                 try:
                     self.visit(tab, then)
@@ -515,6 +511,20 @@ class Rewards:
                 page.remove_listener("response", on_response)
         log.info("  → %s%s", label, "" if reported else " (pas de confirmation du serveur)")
         return True
+
+    def open_card(self, loc: Locator, blank: bool) -> Page | None:
+        """Clique la carte ; renvoie le nouvel onglet qu'elle a ouvert, sinon None."""
+        # La carte ouvre normalement un nouvel onglet ; certaines naviguent dans l'onglet courant.
+        clicked = False
+        try:
+            with self.ctx.expect_page(timeout=20000 if blank else 5000) as info:
+                loc.click(timeout=15000)
+                clicked = True
+            return info.value
+        except PWError:
+            if not clicked:
+                raise
+            return None
 
     def visit(self, tab: Page, then=None):
         with suppress(PWError):
@@ -671,7 +681,15 @@ class Rewards:
         urls = sorted({
             h for h in (a.get_attribute("href") for a in self.page.locator('a[href^="/earn/quest/"]').all()) if h
         })
-        log.info("Quêtes : %d trouvées", len(urls))
+        self.app_quests = [u for u in urls if APP_QUEST.search(u)]
+        urls = [u for u in urls if u not in self.app_quests]
+        log.info("Quêtes : %d trouvées%s", len(urls),
+                 f" (+{len(self.app_quests)} exclusive(s) à l'application Rewards, faite(s) dans l'application)"
+                 if self.app_quests else "")
+        self.do_quests(urls)
+
+    def do_quests(self, urls: list[str]):
+        """Tâches débloquées des quêtes `urls` (chemins /earn/quest/...)."""
 
         def label(o):
             return o.get("ariaLabel") or o.get("linkText") or o["offerId"]

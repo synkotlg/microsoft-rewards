@@ -13,6 +13,7 @@ tu peux utiliser ton PC normalement pendant ce temps.
 | Autres activités | « Continuer à gagner » : quiz, liens Bing, et offres promotionnelles qui rapportent des points (ex. Bing Image Creator +20) |
 | Recherches thématiques | « Explorer sur Bing » : active la carte puis fait une recherche **concrète** sur le thème (une vraie chanson pour « paroles », une vraie ville pour « l'heure »…), sinon Microsoft ne valide pas |
 | Quêtes | tâches débloquées des cartes à tampons (onboarding, tendances du mois, etc.) |
+| Exclusivités de l'application | quête hebdomadaire « Exclusivité de l'application Rewards » (+10 par jour) : faite **dans l'application Rewards pour ordinateur** si elle est installée (voir plus bas), car Microsoft ne la débloque que là |
 | Recherches Bing | jusqu'au plafond du jour (15/30/60 points selon ton niveau), requêtes tirées des tendances Google |
 | Points à réclamer | clique « Prêt à réclamer » : ces points expirent au bout d'un mois s'ils ne sont pas réclamés |
 
@@ -36,6 +37,24 @@ Rien n'est installé, téléchargé ni partagé.
 Non fait : les tâches de l'application mobile Bing (check-in, « lire pour gagner », séries de
 l'application). Sur PC, elles ne sont faisables qu'en imitant l'application auprès des serveurs de
 Microsoft, ce qui est la méthode la plus repérée. Elles prennent une minute à la main sur le téléphone.
+
+## Application Rewards pour ordinateur (facultatif)
+
+La quête « Exclusivité de l'application Rewards » (une recherche Bing par jour, +10, jusqu'à 70 points
+par semaine) est verrouillée dans Edge. Si l'application **Microsoft Rewards** du Microsoft Store est
+installée et connectée à ton compte, le script fait **seulement cette quête** dans l'application ; tout
+le reste continue dans Edge, comme avant.
+
+- L'application est lancée sans fenêtre le temps de la quête, avec un port de débogage local
+  (127.0.0.1) pour la piloter, puis refermée. C'est la vraie application qui déclare l'activité, comme
+  lors d'un clic manuel. Si elle était déjà ouverte (icône près de l'horloge), elle est fermée puis
+  relancée normalement à la fin.
+- Seules les tâches dont le lien mène à Bing sont cliquées : l'application les ouvre dans sa propre
+  fenêtre. Un autre lien s'ouvrirait dans ton navigateur par défaut, il est ignoré.
+- Une seule activité est débloquée chaque jour, et celle d'un jour passé ne se rattrape pas : les deux
+  passages quotidiens de la tâche planifiée suffisent.
+- Application absente : l'étape est sautée. Application non connectée : une ligne dans le journal,
+  ouvre-la une fois pour te connecter.
 
 ## Les points que seul un humain peut gagner
 

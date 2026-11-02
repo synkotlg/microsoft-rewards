@@ -17,6 +17,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+import rewards_app
 import search
 from browser import edge
 from quests import DASHBOARD, EARN, AccountFlagged, Rewards, offers, page_data
@@ -135,6 +136,8 @@ def session(visible: bool, with_search: bool) -> tuple[int, str | None, str]:
                     ("Autres activités", r.more_activities),
                     ("Recherches thématiques", r.explore_on_bing),
                     ("Quêtes", r.quests),
+                    ("Quêtes de l'application Rewards",
+                     lambda: r.done.extend(rewards_app.quests(pw, state, r.app_quests))),
                 ]
                 counters = {}
                 if with_search:
